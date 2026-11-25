@@ -165,25 +165,37 @@ function withNetworks(tunnel, networks) {
 // ---- Profiles ---------------------------------------------------------------
 //
 // One daemon, several accounts (say netbird.io and a self-hosted server). Only
-// one profile is active at a time. `netbird profile list` has no JSON mode;
-// current releases print a table, older ones a check-mark list:
+// one profile is active at a time. `netbird profile list` has no JSON mode.
+// Current releases print a table (with --show-id, an ID column first); older
+// ones a check-mark list. The active mark is ✓ or *:
 //
-//   NAME      ACTIVE          Found 2 profiles:
-//   default                   ✓ default
-//   work      *               ✗ work
+//   ID        NAME       ACTIVE     NAME      ACTIVE     Found 2 profiles:
+//   default   Auerswald            default   ✓          ✓ default
+//   87ed9011  default    ✓         work                 ✗ work
+//
+// Names are free-form and can shadow an ID (the built-in profile's ID is
+// "default", whatever it is called), and `profile select` resolves IDs first.
+// So a profile is selected by its ID when the list gives one, by name otherwise.
 
-var PROFILES_ARGS = ["netbird", "profile", "list"]
+var PROFILES_ARGS = ["netbird", "profile", "list", "--show-id"]
 
 function parseProfiles(text) {
   var out = []
+  var withId = false
   var lines = String(text || "").split("\n")
   for (var i = 0; i < lines.length; i++) {
     var line = lines[i].replace(/\s+$/, "")
+    if (/^ID\s+NAME(\s+ACTIVE)?$/.test(line)) { withId = true; continue }
+    if (/^NAME(\s+ACTIVE)?$/.test(line)) { withId = false; continue }
     var mark = line.match(/^\s*([✓✗])\s+(\S+)$/)
-    if (mark) { out.push({ name: mark[2], active: mark[1] === "✓" }); continue }
-    var row = line.match(/^(\S+)(?:\s+(\*))?$/)
-    if (!row || row[1] === "NAME" || !validProfile(row[1])) continue
-    out.push({ name: row[1], active: row[2] === "*" })
+    if (mark) {
+      if (validProfile(mark[2])) out.push({ id: mark[2], name: mark[2], active: mark[1] === "✓" })
+      continue
+    }
+    var row = withId ? line.match(/^(\S+)\s+(\S+)(?:\s+([✓*]))?$/) : line.match(/^(\S+)(?:\s+([✓*]))?$/)
+    if (!row) continue
+    var p = withId ? { id: row[1], name: row[2], active: !!row[3] } : { id: row[1], name: row[1], active: !!row[2] }
+    if (validProfile(p.id) && validProfile(p.name)) out.push(p)
   }
   return out
 }
@@ -194,21 +206,22 @@ function validProfile(name) {
 }
 
 function withProfiles(tunnel, profiles) {
-  var list = (profiles || []).map(function(p) { return { name: p.name, active: p.active } })
+  var list = (profiles || []).map(function(p) { return { id: p.id, name: p.name, active: p.active } })
   var active = list.filter(function(p) { return p.active })
   var copy = {}
   for (var k in tunnel) copy[k] = tunnel[k]
   copy.profiles = list
-  copy.profile = active.length > 0 ? active[0].name : ""
+  copy.profile = active.length > 0 ? active[0].id : ""
   return copy
 }
 
-// The daemon keeps running on the old account until it reconnects, so a live
-// tunnel goes down, switches and comes back up on the new one. A tunnel that is
-// off stays off: only its switch turns it on.
-function switchProfileCommands(tunnel, name) {
-  if (!tunnel || !validProfile(name) || tunnel.profile === name) return []
-  var select = ["netbird", "profile", "select", "--", name]
+// `id` is the profile's ID (its name on releases that show none). The daemon
+// keeps running on the old account until it reconnects, so a live tunnel goes
+// down, switches and comes back up on the new one. A tunnel that is off stays
+// off: only its switch turns it on.
+function switchProfileCommands(tunnel, id) {
+  if (!tunnel || !validProfile(id) || tunnel.profile === id) return []
+  var select = ["netbird", "profile", "select", "--", id]
   if (tunnel.up || tunnel.connecting) return [DOWN_ARGS, select, UP_ARGS]
   return [select]
 }

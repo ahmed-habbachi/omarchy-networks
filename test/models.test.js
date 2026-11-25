@@ -888,19 +888,37 @@ personal
 work      *
 `
 
+// netbird 0.78 with --show-id: the built-in profile renamed, another one named
+// "default". Selecting by the name "default" would pick the wrong one.
+const PROFILES_ID = `ID        NAME       ACTIVE
+default   Auerswald  
+87ed9011  default    ✓
+`
+
 test("NetBird parses the profile table and marks the active one", () => {
   assert.deepEqual(NetBird.parseProfiles(PROFILES), [
-    { name: "default", active: false },
-    { name: "personal", active: false },
-    { name: "work", active: true },
+    { id: "default", name: "default", active: false },
+    { id: "personal", name: "personal", active: false },
+    { id: "work", name: "work", active: true },
+  ])
+  assert.deepEqual(NetBird.parseProfiles("NAME      ACTIVE\ndefault   ✓\nwork      \n"), [
+    { id: "default", name: "default", active: true },
+    { id: "work", name: "work", active: false },
+  ])
+})
+
+test("NetBird parses the profile table with IDs", () => {
+  assert.deepEqual(NetBird.parseProfiles(PROFILES_ID), [
+    { id: "default", name: "Auerswald", active: false },
+    { id: "87ed9011", name: "default", active: true },
   ])
 })
 
 test("NetBird parses the older check-mark profile list", () => {
   const old = "Found 2 profiles:\n✓ default\n✗ work\n"
   assert.deepEqual(NetBird.parseProfiles(old), [
-    { name: "default", active: true },
-    { name: "work", active: false },
+    { id: "default", name: "default", active: true },
+    { id: "work", name: "work", active: false },
   ])
 })
 
@@ -916,6 +934,16 @@ test("NetBird folds profiles into the tunnel", () => {
   assert.equal(t.profile, "work")
   assert.equal(t.profiles.length, 3)
   assert.equal(base.profiles, undefined) // not mutated
+})
+
+test("NetBird selects a profile by ID, not by a name that shadows one", () => {
+  const base = NetBird.parseStatus('{"daemonStatus":"Idle","peers":{}}')
+  const t = NetBird.withProfiles(base, NetBird.parseProfiles(PROFILES_ID))
+  assert.equal(t.profile, "87ed9011")
+  assert.deepEqual(NetBird.switchProfileCommands(t, "default"), [
+    ["netbird", "profile", "select", "--", "default"],
+  ])
+  assert.deepEqual(NetBird.switchProfileCommands(t, "87ed9011"), [])
 })
 
 test("NetBird profile names are validated before reaching a command", () => {
@@ -954,5 +982,5 @@ test("compose: the poll carries NetBird profiles", () => {
   const nb = b.tunnels.find((t) => t.id === "netbird")
   assert.equal(nb.profile, "work")
   assert.deepEqual(nb.profiles.map((p) => p.name), ["default", "personal", "work"])
-  assert.equal(Compose.POLL_SCRIPT.includes("netbird profile list"), true)
+  assert.equal(Compose.POLL_SCRIPT.includes("netbird profile list --show-id"), true)
 })

@@ -80,7 +80,7 @@ Item {
     if (t.profiles && profileTarget !== "") {
       if (copy === t) { copy = {}; for (var q in t) copy[q] = t[q] }
       copy.profiles = t.profiles.map(function(p) {
-        return { name: p.name, active: p.name === profileTarget, pending: p.name === profileTarget }
+        return { id: p.id, name: p.name, active: p.id === profileTarget, pending: p.id === profileTarget }
       })
       copy.profile = profileTarget
     }
@@ -136,13 +136,13 @@ Item {
 
   // Make another NetBird profile the active one. A connected tunnel reconnects
   // on it; one that is off stays off.
-  function switchProfile(tunnel, name) {
+  function switchProfile(tunnel, id) {
     if (demo) return
     if (!tunnel || actionProcess.running || profileTarget !== "") return
-    var cmds = Compose.profileCommands(tunnel, name)
+    var cmds = Compose.profileCommands(tunnel, id)
     if (cmds.length === 0) return
     lastError = ""
-    profileTarget = name
+    profileTarget = id
     pendingExpiry.restart()
     _run(cmds)
   }

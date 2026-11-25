@@ -44,7 +44,7 @@ SectionBase {
 
   function profileItem(t, p) {
     return {
-      type: "toggle", action: "profile", tunnel: t, profileName: p.name,
+      type: "toggle", action: "profile", tunnel: t, profileId: p.id,
       glyph: theme.glyphs.user, title: p.name,
       detail: p.active ? (p.pending ? "Switching…" : (t.up ? "Connected with this profile" : "Used on next connect")) : "",
       checked: p.active, busy: p.pending === true
@@ -128,7 +128,7 @@ SectionBase {
       else vpn.toggle(item.tunnel)
     }
     else if (item.action === "exit") vpn.toggleExit(item.tunnel, item.exitId)
-    else if (item.action === "profile") vpn.switchProfile(item.tunnel, item.profileName)
+    else if (item.action === "profile") vpn.switchProfile(item.tunnel, item.profileId)
     else if (item.action === "login" && t && t.authUrl) Quickshell.execDetached(["xdg-open", t.authUrl])
     else if (item.action === "operator") vpn.runAction(Tailscale.operatorCommand(Quickshell.env("USER")))
   }
